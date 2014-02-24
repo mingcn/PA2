@@ -8,24 +8,40 @@ import java.sql.ResultSet;
 public class PA2 {
 public static void main(String[] args) {
 	Connection conn = null;
-	try {
+	try 
+	{
 		Class.forName("org.sqlite.JDBC");
 		conn = DriverManager.getConnection("jdbc:sqlite:pa2.db");
 		System.out.println("opened database successfully");
 
 		Statement stmt = conn.createStatement();
+		System.out.println("Creating Core table");
 		stmt.executeUpdate("Drop TABLE IF EXISTS Core");
 		stmt.executeUpdate("CREATE TABLE Core (course VARCHAR(20))");
-		stmt.executeUpdate("INSERT INTO Core VALUES ('CSE101'), ('CSE132A');");
+		int i = stmt.executeUpdate("INSERT INTO Core VALUES ('CSE101'), ('CSE132A');");
 
+		System.out.println("this is i " + i);
+
+		try 
+		{
+			i = stmt.executeUpdate("DELETE FROM Core where course = 'CSE101'");
+			System.out.println("this is i " + i);
+		}
+		catch(SQLException se)
+		{
+			se.printStackTrace();
+		}
+
+		/*System.out.println("Creating Elective table");
 		stmt.executeUpdate("Drop TABLE IF EXISTS Elective");
 		stmt.executeUpdate("CREATE TABLE Elective (course VARCHAR(20))");
 		stmt.executeUpdate("INSERT INTO Elective VALUES ('ECE101'), ('ECE100');");
 
+		System.out.println("Creating Prereq table");
 		stmt.executeUpdate("Drop TABLE IF EXISTS Prereq");
 		stmt.executeUpdate("CREATE TABLE Prereq (course VARCHAR(20), prereq VARCHAR(20))");
 		stmt.executeUpdate("INSERT INTO Prereq VALUES ('CSE132a, CSE101'), ('ECE101, ECE100');");
-
+*/
 		//execute update returns an int of the number of rows you updated, who cares
 
 		// query the database
@@ -48,12 +64,29 @@ public static void main(String[] args) {
 		stmt.close();
 		rset.close();
 		//pstmt.close();
+
+		//TODO: Create Helper Tables
+		//Students - Copy distinct name from Records, delete name from table as we are doing calculations
+		//courses_taken - find the courses a student has taken using Records and Students
+		//not_taken_core - find the core classes the student has not taken from Core and courses_taken
+		//not_taken_elective - 
+
+		//TODO: Write a loop 
+
+			//how to choose one random student : "select * from students limit 1"
+
+		//TODO: Drop Tables
 		
 
-	} catch (Exception e) {
-		try {
+	} 
+	catch (Exception e) 
+	{
+		try 
+		{
 			conn.close();
-		} catch(SQLException e1) {
+		} 
+		catch(SQLException e1) 
+		{
 			e1.printStackTrace();
 		}
 	}
