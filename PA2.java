@@ -13,14 +13,56 @@ public static void main(String[] args) {
 		Class.forName("org.sqlite.JDBC");
 		conn = DriverManager.getConnection("jdbc:sqlite:pa2.db");
 		System.out.println("opened database successfully");
+		System.out.println();
 
 		Statement stmt = conn.createStatement();
-		System.out.println("Creating Core table");
-		stmt.executeUpdate("Drop TABLE IF EXISTS Core");
-		stmt.executeUpdate("CREATE TABLE Core (course VARCHAR(20))");
-		int i = stmt.executeUpdate("INSERT INTO Core VALUES ('CSE101'), ('CSE132A');");
+		try
+		{
+			System.out.println("Creating quartersToGraduation table");
+			stmt.executeUpdate("Drop TABLE IF EXISTS quartersToGraduation");
+			stmt.executeUpdate("DROP TABLE IF EXISTS zero;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_names");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_names_and_courses");
+			stmt.executeUpdate("DROP VIEW IF EXISTS graduated_students");
 
-		System.out.println("this is i " + i);
+			stmt.executeUpdate("CREATE TABLE quartersToGraduation (student VARCHAR(20), quartersToGraduation int);");
+			stmt.executeUpdate("CREATE TABLE zero (zero int);");
+			stmt.executeUpdate("INSERT INTO zero VALUES(0);");
+
+			int i = stmt.executeUpdate("INSERT INTO quartersToGraduation select distinct r.student, z.zero from record r, zero z;");
+
+
+			stmt.executeUpdate("CREATE TABLE all_courses (course char(32));");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM core;");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM elective;");
+
+			stmt.executeUpdate("CREATE TABLE all_names (student char(32));");
+			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT STUDENT FROM RECORD");
+
+			stmt.executeUpdate("CREATE TABLE all_names_and_courses (student char(32), course char(32));");
+			stmt.executeUpdate("INSERT INTO all_names_and_courses SELECT * FROM all_names, all_courses;");
+
+			stmt.executeUpdate("CREATE view graduated_students as " +
+								" SELECT distinct student " +
+								" from record r1 " +
+								" where " +
+									" (select count(*) " +
+									" from record r2 " +
+									" where r1.student = r2.student " +
+									" and r2.course in " +
+										" (select course from elective)) > 4" +
+									" AND " +
+									" (select count(*) " +
+									 " from record r2 " +
+									 " where r1.student = r2.student " +
+									 " and r2.course in " +
+									 	" (select course from core)) = (select count(*) from core);");
+		}
+		catch(SQLException e) {e.printStackTrace();}
+	
+
+		/*System.out.println("this is i " + i);
 
 		try 
 		{
@@ -30,22 +72,14 @@ public static void main(String[] args) {
 		catch(SQLException se)
 		{
 			se.printStackTrace();
-		}
+		}*/
 
-		/*System.out.println("Creating Elective table");
-		stmt.executeUpdate("Drop TABLE IF EXISTS Elective");
-		stmt.executeUpdate("CREATE TABLE Elective (course VARCHAR(20))");
-		stmt.executeUpdate("INSERT INTO Elective VALUES ('ECE101'), ('ECE100');");
-
-		System.out.println("Creating Prereq table");
-		stmt.executeUpdate("Drop TABLE IF EXISTS Prereq");
-		stmt.executeUpdate("CREATE TABLE Prereq (course VARCHAR(20), prereq VARCHAR(20))");
-		stmt.executeUpdate("INSERT INTO Prereq VALUES ('CSE132a, CSE101'), ('ECE101, ECE100');");
-*/
 		//execute update returns an int of the number of rows you updated, who cares
 
+		System.out.println();
+
 		// query the database
-		ResultSet rset = stmt.executeQuery("SELECT * FROM Core");
+		ResultSet rset = stmt.executeQuery("SELECT * FROM all_courses");
 		System.out.println("Statement Query result");
 		while (rset.next()) {
 			System.out.println("" + rset.getString("course"));
