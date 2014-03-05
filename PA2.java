@@ -8,6 +8,7 @@ import java.sql.ResultSet;
 public class PA2 {
 public static void main(String[] args) {
 	Connection conn = null;
+	int numberOfUpdates = 1;
 	try 
 	{
 		Class.forName("org.sqlite.JDBC");
@@ -18,19 +19,21 @@ public static void main(String[] args) {
 		Statement stmt = conn.createStatement();
 		try
 		{
-			System.out.println("Creating quartersToGraduation table");
-			stmt.executeUpdate("Drop TABLE IF EXISTS quartersToGraduation");
+			System.out.println("Creating QuartersToGraduation table");
+			stmt.executeUpdate("Drop TABLE IF EXISTS QuartersToGraduation");
 			stmt.executeUpdate("DROP TABLE IF EXISTS zero;");
-			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses");
-			stmt.executeUpdate("DROP TABLE IF EXISTS all_names");
-			stmt.executeUpdate("DROP TABLE IF EXISTS all_names_and_courses");
-			stmt.executeUpdate("DROP VIEW IF EXISTS graduated_students");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_names;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS all_names_and_courses;");
+			stmt.executeUpdate("DROP VIEW IF EXISTS graduated_students;");
+			stmt.executeUpdate("DROP VIEW IF EXISTS not_taken;");
+			stmt.executeUpdate("DROP VIEW IF EXISTS courses_to_take;");
 
-			stmt.executeUpdate("CREATE TABLE quartersToGraduation (student VARCHAR(20), quartersToGraduation int);");
+			stmt.executeUpdate("CREATE TABLE QuartersToGraduation (student VARCHAR(20), QuartersToGraduation int);");
 			stmt.executeUpdate("CREATE TABLE zero (zero int);");
 			stmt.executeUpdate("INSERT INTO zero VALUES(0);");
 
-			int i = stmt.executeUpdate("INSERT INTO quartersToGraduation select distinct r.student, z.zero from record r, zero z;");
+			int i = stmt.executeUpdate("INSERT INTO QuartersToGraduation select distinct r.student, z.zero from record r, zero z;");
 
 
 			stmt.executeUpdate("CREATE TABLE all_courses (course char(32));");
@@ -42,6 +45,8 @@ public static void main(String[] args) {
 
 			stmt.executeUpdate("CREATE TABLE all_names_and_courses (student char(32), course char(32));");
 			stmt.executeUpdate("INSERT INTO all_names_and_courses SELECT * FROM all_names, all_courses;");
+
+
 
 			stmt.executeUpdate("CREATE view graduated_students as " +
 								" SELECT distinct student " +
@@ -58,6 +63,30 @@ public static void main(String[] args) {
 									 " where r1.student = r2.student " +
 									 " and r2.course in " +
 									 	" (select course from core)) = (select count(*) from core);");
+
+			stmt.executeUpdate("CREATE VIEW not_taken AS " +
+							   	"SELECT * FROM all_names_and_courses " +
+							   	"EXCEPT SELECT * FROM record;");
+
+			stmt.executeUpdate("CREATE VIEW courses_to_take AS " +
+								" SELECT DISTINCT nt.student, nt.course " +
+								" FROM Prerequisite p1, not_taken nt " + 
+								" WHERE nt.student NOT IN graduated_students AND p1.course = nt.course AND NOT EXISTS " + 
+									" (SELECT * " + 
+									" FROM Prerequisite p2 " +
+									" WHERE p2.course = p1.course AND NOT EXISTS " +
+										" (SELECT * " + 
+										" FROM Record r " + 
+										" WHERE nt.student = r.student AND p2.Prereq = r.course));");
+
+			stmt.executeUpdate("INSERT INTO record SELECT * FROM courses_to_take;");
+
+			numberOfUpdates = stmt.executeUpdate("UPDATE QuartersToGraduation SET QuartersToGraduation = QuartersToGraduation + 1 " + 
+													"WHERE student IN (SELECT student FROM courses_to_take);");
+
+			System.out.println(numberOfUpdates);
+
+
 		}
 		catch(SQLException e) {e.printStackTrace();}
 	
