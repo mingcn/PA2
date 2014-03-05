@@ -19,6 +19,8 @@ public static void main(String[] args) {
 		try
 		{
 			System.out.println("Creating quartersToGraduation table");
+
+            // drop all our tables
 			stmt.executeUpdate("Drop TABLE IF EXISTS quartersToGraduation");
 			stmt.executeUpdate("DROP TABLE IF EXISTS zero;");
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses");
@@ -26,23 +28,28 @@ public static void main(String[] args) {
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_names_and_courses");
 			stmt.executeUpdate("DROP VIEW IF EXISTS graduated_students");
 
-			stmt.executeUpdate("CREATE TABLE quartersToGraduation (student VARCHAR(20), quartersToGraduation int);");
+
+
+
+            // initialize QuartersToGraduation with all students, 0 
+			stmt.executeUpdate("CREATE TABLE QuartersToGraduation (student VARCHAR(20), quartersToGraduation int);");
 			stmt.executeUpdate("CREATE TABLE zero (zero int);");
 			stmt.executeUpdate("INSERT INTO zero VALUES(0);");
+			stmt.executeUpdate("INSERT INTO QuartersToGraduation select distinct r.Student, z.zero from Record r, zero z;");
 
-			int i = stmt.executeUpdate("INSERT INTO quartersToGraduation select distinct r.student, z.zero from record r, zero z;");
 
-
+            // create a table with the names of every student, and every course available
 			stmt.executeUpdate("CREATE TABLE all_courses (course char(32));");
-			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM core;");
-			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM elective;");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Core;");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Elective;");
 
 			stmt.executeUpdate("CREATE TABLE all_names (student char(32));");
-			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT STUDENT FROM RECORD");
+			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT Student FROM Record");
 
 			stmt.executeUpdate("CREATE TABLE all_names_and_courses (student char(32), course char(32));");
 			stmt.executeUpdate("INSERT INTO all_names_and_courses SELECT * FROM all_names, all_courses;");
 
+            
 			stmt.executeUpdate("CREATE view graduated_students as " +
 								" SELECT distinct student " +
 								" from record r1 " +
