@@ -1,3 +1,12 @@
+/*
+ * JDBC Project, March 7, 2014
+ * Group Members:
+ * (1) Thaddeus Trinh, A09412517 
+ * (2) Jayon Huh, 
+ * (3) David Muller, A09252886
+ */
+
+
 import java.sql.Connection; 
 import java.sql.DriverManager; 
 import java.sql.SQLException; 
@@ -13,13 +22,11 @@ public static void main(String[] args) {
 	{
 		Class.forName("org.sqlite.JDBC");
 		conn = DriverManager.getConnection("jdbc:sqlite:pa2.db");
-		System.out.println("opened database successfully");
-		System.out.println();
-
-		Statement stmt = conn.createStatement();
+		
+        Statement stmt = conn.createStatement();
 		try
 		{
-			System.out.println("Creating QuartersToGraduation table");
+            // drop all of our helper tables
 			stmt.executeUpdate("Drop TABLE IF EXISTS QuartersToGraduation");
 			stmt.executeUpdate("DROP TABLE IF EXISTS zero;");
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses;");
@@ -29,120 +36,86 @@ public static void main(String[] args) {
 			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
 			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
 
-			stmt.executeUpdate("CREATE TABLE QuartersToGraduation (student VARCHAR(20), QuartersToGraduation int);");
+            
+            // create QuartersToGraduation Table. initialize with (Student, 0) for all Students
+			stmt.executeUpdate("CREATE TABLE QuartersToGraduation (Student char(32), Quarters int);");
 			stmt.executeUpdate("CREATE TABLE zero (zero int);");
 			stmt.executeUpdate("INSERT INTO zero VALUES(0);");
+			int i = stmt.executeUpdate("INSERT INTO QuartersToGraduation select distinct r.Student, z.zero from Record r, zero z;");
 
-			int i = stmt.executeUpdate("INSERT INTO QuartersToGraduation select distinct r.student, z.zero from record r, zero z;");
-
+            
             // create a table with the names of every student, and every course available
-			stmt.executeUpdate("CREATE TABLE all_courses (Course VARCHAR(20));");
+			stmt.executeUpdate("CREATE TABLE all_courses (Course char(32));");
 			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Core;");
 			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Elective;");
 
-			stmt.executeUpdate("CREATE TABLE all_names (Student VARCHAR(20));");
+			stmt.executeUpdate("CREATE TABLE all_names (Student char(32));");
 			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT Student FROM Record");
 
-			stmt.executeUpdate("CREATE TABLE all_names_and_courses (Student VARCHAR(20), Course VARCHAR(20));");
+			stmt.executeUpdate("CREATE TABLE all_names_and_courses (Student char(32), Course char(32));");
 			stmt.executeUpdate("INSERT INTO all_names_and_courses SELECT * FROM all_names, all_courses;");
 
+                
 			while(numberOfUpdates != 0)
 			{
+                // drop/create all our helper tables, so we have clean versions for this loop iteration
+			    stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
+			    stmt.executeUpdate("CREATE TABLE graduated_students (Student char(32));");
+			    stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
+			    stmt.executeUpdate("CREATE TABLE not_taken (Student char(32), Course char(32));");
+			    stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
+			    stmt.executeUpdate("CREATE TABLE courses_to_take (Student char(32), Course char(32));");
 
-			stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
-			stmt.executeUpdate("CREATE TABLE graduated_students (Student VARCHAR(20));");
-			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
-			stmt.executeUpdate("CREATE TABLE not_taken (Student VARCHAR(20), Course VARCHAR(20));");
-			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
-			stmt.executeUpdate("CREATE TABLE courses_to_take (Student VARCHAR(20), Course VARCHAR(20));");
-
-			stmt.executeUpdate("INSERT INTO graduated_students " +
-								" SELECT distinct student " +
-								" from record r1 " +
-								" where " +
-									" (select count(*) " +
-									" from record r2 " +
-									" where r1.student = r2.student " +
-									" and r2.course in " +
-										" (select course from elective)) > 4" +
+			    // find all graduated students
+                stmt.executeUpdate("INSERT INTO graduated_students " +
+								    " SELECT distinct student " +
+								    " from Record r1 " +
+								    " where " +
+									    " (select count(*) " +
+									    " from Record r2 " +
+									    " where r1.Student = r2.Student " +
+									    " and r2.Course in " +
+										    " (select Course from Elective)) > 4" +
 									" AND " +
-									" (select count(*) " +
-									 " from record r2 " +
-									 " where r1.student = r2.student " +
-									 " and r2.course in " +
-									 	" (select course from core)) = (select count(*) from core);");
+									    " (select count(*) " +
+									    " from Record r2 " +
+									    " where r1.Student = r2.Student " +
+									    " and r2.course in " +
+									 	    " (select Course from core)) = (select count(*) from Core);");
 
-			/*stmt.executeUpdate("CREATE view graduated_students as " +
-								" SELECT distinct student " +
-								" from record r1 " +
-								" where " +
-									" (select count(*) " +
-									" from record r2 " +
-									" where r1.student = r2.student " +
-									" and r2.course in " +
-										" (select course from elective)) > 4" +
-									" AND " +
-									" (select count(*) " +
-									 " from record r2 " +
-									 " where r1.student = r2.student " +
-									 " and r2.course in " +
-									 	" (select course from core)) = (select count(*) from core);");*/
+                // find all courses that haven't been taken this quarter
+			    stmt.executeUpdate("INSERT INTO not_taken " +
+							   	    "SELECT * FROM all_names_and_courses " +
+							   	    "EXCEPT SELECT * FROM record;");
 
-			stmt.executeUpdate("INSERT INTO not_taken " +
-							   	"SELECT * FROM all_names_and_courses " +
-							   	"EXCEPT SELECT * FROM record;");
+                // insert into courses_to_take (Student, Course) tuples where the Student
+                // has not Graduated and the course Prereqs are satisified (or there are no Prereqs)
+			    stmt.executeUpdate("INSERT INTO courses_to_take " +
+								    " SELECT DISTINCT nt.Student, nt.Course " +
+								    " FROM Prerequisite p1, not_taken nt " + 
+								    " WHERE nt.Course NOT IN (select Course from Prerequisite)" +
+                                    " OR nt.Student NOT IN graduated_students" +
+                                    " AND p1.Course = nt.Course AND NOT EXISTS " + 
+									    " (SELECT * " + 
+									    " FROM Prerequisite p2 " +
+									    " WHERE p2.Course = p1.Course AND NOT EXISTS " +
+										    " (SELECT * " + 
+										    " FROM Record r " + 
+										    " WHERE nt.student = r.Student AND p2.Prereq = r.Course));");
 
-			/*stmt.executeUpdate("CREATE VIEW not_taken AS " +
-							   	"SELECT * FROM all_names_and_courses " +
-							   	"EXCEPT SELECT * FROM record;");*/
 
-			stmt.executeUpdate("INSERT INTO courses_to_take " +
-								" SELECT DISTINCT nt.student, nt.course " +
-								" FROM Prerequisite p1, not_taken nt " + 
-								" WHERE nt.course NOT IN (select course from prerequisite) OR nt.student NOT IN graduated_students AND p1.course = nt.course AND NOT EXISTS " + 
-									" (SELECT * " + 
-									" FROM Prerequisite p2 " +
-									" WHERE p2.course = p1.course AND NOT EXISTS " +
-										" (SELECT * " + 
-										" FROM Record r " + 
-										" WHERE nt.student = r.student AND p2.Prereq = r.course));");
+                // update Record with all courses to be taken this quarter
+			    stmt.executeUpdate("INSERT INTO record SELECT * FROM courses_to_take;");
 
-			/*stmt.executeUpdate("CREATE VIEW courses_to_take AS " +
-								" SELECT DISTINCT nt.student, nt.course " +
-								" FROM Prerequisite p1, not_taken nt " + 
-								" WHERE nt.student NOT IN graduated_students AND p1.course = nt.course AND NOT EXISTS " + 
-									" (SELECT * " + 
-									" FROM Prerequisite p2 " +
-									" WHERE p2.course = p1.course AND NOT EXISTS " +
-										" (SELECT * " + 
-										" FROM Record r " + 
-										" WHERE nt.student = r.student AND p2.Prereq = r.course));");*/
+                // add 1 to Quarters to graduate for every Student who took courses this quarter
+			    numberOfUpdates = stmt.executeUpdate("UPDATE QuartersToGraduation SET Quarters = Quarters + 1 " + 
+													"WHERE Student IN (SELECT Student FROM courses_to_take);");
 
-			/*ResultSet rset = stmt.executeQuery("SELECT * FROM courses_to_take");
-			System.out.println("Statement Query result");
-			while (rset.next()) {
-			System.out.println("" + rset.getString("student") + " " + rset.getString("course"));
-			}*/
-
-			stmt.executeUpdate("INSERT INTO record SELECT * FROM courses_to_take;");
-
-			numberOfUpdates = stmt.executeUpdate("UPDATE QuartersToGraduation SET QuartersToGraduation = QuartersToGraduation + 1 " + 
-													"WHERE student IN (SELECT student FROM courses_to_take);");
-
-			//System.out.println(numberOfUpdates);
-
-			/*ResultSet rset = stmt.executeQuery("SELECT * FROM QuartersToGraduation");
-			System.out.println("Statement Query result");
-			while (rset.next()) {
-			System.out.println("" + rset.getString("student") + " " + rset.getInt("QuartersToGraduation"));
-			}*/
-
-			stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
-			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
-			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
+                // drop helper tables
+			    stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
+			    stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
+			    stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
 			}
-
-
 		}
 		catch(SQLException e) {e.printStackTrace();}
 	
@@ -160,13 +133,8 @@ public static void main(String[] args) {
 			e1.printStackTrace();
 		}
 	}
-
 }
 }
-
-
-
-
 
 
 
