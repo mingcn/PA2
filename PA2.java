@@ -25,9 +25,9 @@ public static void main(String[] args) {
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_courses;");
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_names;");
 			stmt.executeUpdate("DROP TABLE IF EXISTS all_names_and_courses;");
-			stmt.executeUpdate("DROP VIEW IF EXISTS graduated_students;");
-			stmt.executeUpdate("DROP VIEW IF EXISTS not_taken;");
-			stmt.executeUpdate("DROP VIEW IF EXISTS courses_to_take;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
 
 			stmt.executeUpdate("CREATE TABLE QuartersToGraduation (student VARCHAR(20), QuartersToGraduation int);");
 			stmt.executeUpdate("CREATE TABLE zero (zero int);");
@@ -35,20 +35,28 @@ public static void main(String[] args) {
 
 			int i = stmt.executeUpdate("INSERT INTO QuartersToGraduation select distinct r.student, z.zero from record r, zero z;");
 
-
+            // create a table with the names of every student, and every course available
 			stmt.executeUpdate("CREATE TABLE all_courses (course char(32));");
-			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM core;");
-			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM elective;");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Core;");
+			stmt.executeUpdate("INSERT INTO all_courses SELECT * FROM Elective;");
 
 			stmt.executeUpdate("CREATE TABLE all_names (student char(32));");
-			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT STUDENT FROM RECORD");
+			stmt.executeUpdate("INSERT INTO all_names SELECT DISTINCT Student FROM Record");
 
 			stmt.executeUpdate("CREATE TABLE all_names_and_courses (student char(32), course char(32));");
 			stmt.executeUpdate("INSERT INTO all_names_and_courses SELECT * FROM all_names, all_courses;");
 
+			while(numberOfUpdates != 0)
+			{
 
+			stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
+			stmt.executeUpdate("CREATE TABLE graduated_students (student VARCHAR(20));");
+			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
+			stmt.executeUpdate("CREATE TABLE not_taken (student VARCHAR(20), course VARCHAR(20));");
+			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
+			stmt.executeUpdate("CREATE TABLE courses_to_take (student VARCHAR(20), course VARCHAR(20));");
 
-			stmt.executeUpdate("CREATE view graduated_students as " +
+			stmt.executeUpdate("INSERT INTO graduated_students " +
 								" SELECT distinct student " +
 								" from record r1 " +
 								" where " +
@@ -64,11 +72,31 @@ public static void main(String[] args) {
 									 " and r2.course in " +
 									 	" (select course from core)) = (select count(*) from core);");
 
-			stmt.executeUpdate("CREATE VIEW not_taken AS " +
+			/*stmt.executeUpdate("CREATE view graduated_students as " +
+								" SELECT distinct student " +
+								" from record r1 " +
+								" where " +
+									" (select count(*) " +
+									" from record r2 " +
+									" where r1.student = r2.student " +
+									" and r2.course in " +
+										" (select course from elective)) > 4" +
+									" AND " +
+									" (select count(*) " +
+									 " from record r2 " +
+									 " where r1.student = r2.student " +
+									 " and r2.course in " +
+									 	" (select course from core)) = (select count(*) from core);");*/
+
+			stmt.executeUpdate("INSERT INTO not_taken " +
 							   	"SELECT * FROM all_names_and_courses " +
 							   	"EXCEPT SELECT * FROM record;");
 
-			stmt.executeUpdate("CREATE VIEW courses_to_take AS " +
+			/*stmt.executeUpdate("CREATE VIEW not_taken AS " +
+							   	"SELECT * FROM all_names_and_courses " +
+							   	"EXCEPT SELECT * FROM record;");*/
+
+			stmt.executeUpdate("INSERT INTO courses_to_take " +
 								" SELECT DISTINCT nt.student, nt.course " +
 								" FROM Prerequisite p1, not_taken nt " + 
 								" WHERE nt.student NOT IN graduated_students AND p1.course = nt.course AND NOT EXISTS " + 
@@ -79,12 +107,40 @@ public static void main(String[] args) {
 										" FROM Record r " + 
 										" WHERE nt.student = r.student AND p2.Prereq = r.course));");
 
+			/*stmt.executeUpdate("CREATE VIEW courses_to_take AS " +
+								" SELECT DISTINCT nt.student, nt.course " +
+								" FROM Prerequisite p1, not_taken nt " + 
+								" WHERE nt.student NOT IN graduated_students AND p1.course = nt.course AND NOT EXISTS " + 
+									" (SELECT * " + 
+									" FROM Prerequisite p2 " +
+									" WHERE p2.course = p1.course AND NOT EXISTS " +
+										" (SELECT * " + 
+										" FROM Record r " + 
+										" WHERE nt.student = r.student AND p2.Prereq = r.course));");*/
+
+			ResultSet rset = stmt.executeQuery("SELECT * FROM courses_to_take");
+			System.out.println("Statement Query result");
+			while (rset.next()) {
+			System.out.println("" + rset.getString("student") + " " + rset.getString("course"));
+			}
+
 			stmt.executeUpdate("INSERT INTO record SELECT * FROM courses_to_take;");
 
 			numberOfUpdates = stmt.executeUpdate("UPDATE QuartersToGraduation SET QuartersToGraduation = QuartersToGraduation + 1 " + 
 													"WHERE student IN (SELECT student FROM courses_to_take);");
 
-			System.out.println(numberOfUpdates);
+			//System.out.println(numberOfUpdates);
+
+			/*ResultSet rset = stmt.executeQuery("SELECT * FROM QuartersToGraduation");
+			System.out.println("Statement Query result");
+			while (rset.next()) {
+			System.out.println("" + rset.getString("student") + " " + rset.getInt("QuartersToGraduation"));
+			}*/
+
+			stmt.executeUpdate("DROP TABLE IF EXISTS graduated_students;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS not_taken;");
+			stmt.executeUpdate("DROP TABLE IF EXISTS courses_to_take;");
+			}
 
 
 		}
@@ -105,14 +161,14 @@ public static void main(String[] args) {
 
 		//execute update returns an int of the number of rows you updated, who cares
 
-		System.out.println();
+		/*System.out.println();
 
 		// query the database
 		ResultSet rset = stmt.executeQuery("SELECT * FROM all_courses");
 		System.out.println("Statement Query result");
 		while (rset.next()) {
 			System.out.println("" + rset.getString("course"));
-		}
+		}*/
 		// prepared statement
 		/*PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM aa WHERE a == ? OR b == ?");
 		pstmt.setString(1, "1");
@@ -125,7 +181,7 @@ public static void main(String[] args) {
 
 
 		stmt.close();
-		rset.close();
+		//rset.close();
 		//pstmt.close();
 
 		//TODO: Create Helper Tables
